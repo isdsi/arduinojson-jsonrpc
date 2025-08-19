@@ -174,12 +174,21 @@ void json_rpc_method_sum_all_object(JsonVariant r, JsonVariant p0, JsonVariant p
     log_i("r %f", r.as<int>());
 }
 
+// USER CHANGE
+void json_rpc_method_say_hello(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    r.set<const char *>("hello");
+    log_i("r %s", r.as<const char *>());
+}
+
+
 void setup(void)
 {
     Serial.begin(115200);
     Serial1.begin(115200, SERIAL_8N1, 18, 17);
     Serial.printf("arduino-json-rpc-server-example\n");
-
+    
+    log_i("info");
     json_rpc_server_add_method("subtract", json_rpc_method_subtract, "minuend", JSON_RPC_PARAM_INT, "subtrahend", JSON_RPC_PARAM_INT, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("choice", json_rpc_method_choice, "select", JSON_RPC_PARAM_BOOL, "text1", JSON_RPC_PARAM_STRING, "text2", JSON_RPC_PARAM_STRING);
     json_rpc_server_add_method("add", json_rpc_method_add, "a", JSON_RPC_PARAM_FLOAT, "", JSON_RPC_PARAM_NONE, "c", JSON_RPC_PARAM_FLOAT);
@@ -187,13 +196,14 @@ void setup(void)
     json_rpc_server_add_method("sum_array", json_rpc_method_sum_array, "obj", JSON_RPC_PARAM_ARRAY, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("sum_array_object", json_rpc_method_sum_array_object, "obj", JSON_RPC_PARAM_ARRAY, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("sum_all_object", json_rpc_method_sum_all_object, "a", JSON_RPC_PARAM_OBJECT, "b", JSON_RPC_PARAM_OBJECT, "c", JSON_RPC_PARAM_OBJECT);
+    json_rpc_server_add_method("say_hello", json_rpc_method_say_hello, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
 }
 
 void loop(void)
 {
 
     String s;
-    
+    /*
     // rpc call with positional parameters
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":1}");
     json_rpc_loop();
@@ -254,8 +264,38 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
+
+    // rpc call Batch, invalid JSON:
+    json_rpc_client_send_request("[{\"jsonrpc\": \"2.0\", \"method\": \"sum\", \"params\": [1,2,4], \"id\": \"1\"},{\"jsonrpc\": \"2.0\", \"method\"]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+    */
+    // rpc call with an empty Array:
+    json_rpc_client_send_request("[]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
     
-    
+    // rpc call with invalid Batch:
+    json_rpc_client_send_request("[1,2,3]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("[{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
+                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
+                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}]"
+                , s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+
+
     // CUSTOM TEST CASE
 
     /*
@@ -336,7 +376,24 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");   
-    */
 
+    // there is no param
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"say_hello\",\"params\": null,\"id\":1}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");   
+
+    // there is no param with array
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"say_hello\",\"params\": [],\"id\":1}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":\"hello\",\"id\":1}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");   
+    */
     delay(1000);
 }
