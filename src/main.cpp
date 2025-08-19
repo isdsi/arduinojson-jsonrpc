@@ -79,11 +79,11 @@ void json_rpc_server_add_method(const char* method, json_rpc_method_t m,
     const char *p2Name, json_rpc_param_t p2Type)
 {
     json_rpc_server[method]["func"] = (unsigned int)m;
-    if (p0Name != NULL || strlen(p0Name) == 0)
+    if (p0Name != NULL && strlen(p0Name) != 0)
         json_rpc_server[method]["params"][p0Name] = p0Type;
-    if (p1Name != NULL || strlen(p1Name) == 0)
+    if (p1Name != NULL && strlen(p1Name) != 0)
         json_rpc_server[method]["params"][p1Name] = p1Type;
-    if (p2Name != NULL || strlen(p2Name) == 0)
+    if (p2Name != NULL && strlen(p2Name) != 0)
         json_rpc_server[method]["params"][p2Name] = p2Type;
 }
 
@@ -148,18 +148,48 @@ bool json_rpc_variant_is(JsonVariant v, json_rpc_param_t p)
 {
     if (p == JSON_RPC_PARAM_NONE)
         return false;
-    else if (p == JSON_RPC_PARAM_BOOL && v.is<bool>() == false)
-        return false;
-    else if (p == JSON_RPC_PARAM_INT && v.is<int>() == false)
-        return false;
-    else if (p == JSON_RPC_PARAM_FLOAT && v.is<double>() == false)
-        return false;
-    else if (p == JSON_RPC_PARAM_STRING && v.is<const char *>() == false)
-        return false;
-    else if (p == JSON_RPC_PARAM_ARRAY && v.is<JsonArray>() == false)
-        return false;
-    else if (p == JSON_RPC_PARAM_OBJECT && v.is<JsonObject>() == false)
-        return false;
+    else if (p == JSON_RPC_PARAM_BOOL)
+    {
+        if (v.is<bool>() == false)
+            return false;
+        else
+            Serial.printf("v %s\n", v.as<bool>() ? "true" : "false");
+    }
+    else if (p == JSON_RPC_PARAM_INT)
+    {
+        if (v.is<int>() == false)
+            return false;
+        else
+            Serial.printf("v %d\n", v.as<int>());
+    }
+    else if (p == JSON_RPC_PARAM_FLOAT)
+    {
+        if (v.is<double>() == false)
+            return false;
+        else
+            Serial.printf("v %f\n", v.as<double>());
+    }
+    else if (p == JSON_RPC_PARAM_STRING)
+    {
+        if (v.is<const char *>() == false)
+            return false;
+        else
+            Serial.printf("v %s\n", v.as<const char *>());
+    }
+    else if (p == JSON_RPC_PARAM_ARRAY)
+    {
+        if (v.is<JsonArray>() == false)
+            return false;
+        else
+            Serial.printf("v array count %d\n", v.as<JsonArray>().size());
+    }
+    else if (p == JSON_RPC_PARAM_OBJECT)
+    {
+        if (v.is<JsonObject>() == false)
+            return false;
+        else
+            Serial.printf("v object count %d\n", v.as<JsonObject>().size());
+    }
 
     return true;
 }
@@ -248,12 +278,13 @@ void json_rpc_loop(void)
         int vi = 0;
         for (JsonPair kv : server_params)
         {
-            Serial.printf("param %s type %d\n", kv.key().c_str(), kv.value().as<int>());
+            const char *server_param_key = kv.key().c_str();
             json_rpc_param_t server_param_type = (json_rpc_param_t)kv.value().as<int>();
+            Serial.printf("param %s type %d\n", server_param_key, server_param_type);
             
-            if (json_rpc_variant_is(joParams[kv.key().c_str()], server_param_type))
+            if (json_rpc_variant_is(joParams[server_param_key], server_param_type))
             {
-                client_value[vi] = joParams[kv.key().c_str()];
+                client_value[vi] = joParams[server_param_key];
                 //Serial.printf("v[%d] %d\n", vi, client_value[vi].as<int>());
             }
             vi++;
@@ -335,6 +366,137 @@ void json_rpc_method_add2(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVar
     Serial.printf("r %f\n", r.as<double>());
 }
 
+void json_rpc_method_get_obj_name(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    Serial.printf("json_rpc_method_get_obj_name\n");
+    if (p0.is<JsonObject>() == false)
+        return;    
+
+    JsonObject jo = p0.as<JsonObject>();
+    Serial.printf("p0[\"name\"] %s\n", jo["name"].as<const char*>());
+    Serial.printf("p1 %f\n", p1.as<double>());
+    Serial.printf("p2 %f\n", p2.as<double>());
+    r.set<const char*>(jo["name"].as<const char*>());
+    Serial.printf("r %f\n", r.as<const char *>());
+}
+
+void json_rpc_method_sum_array(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    Serial.printf("json_rpc_method_sum_array\n");
+    json_rpc_variant_is(p0, JSON_RPC_PARAM_ARRAY);
+
+    if (p0.is<JsonArray>() == false)
+    {
+        Serial.printf("p0 is not array\n");
+        r.set<int>(0);
+        return;    
+    }
+    int sum = 0;
+    JsonArray ja = p0.as<JsonArray>();
+    for(int i = 0; i < ja.size(); i++)
+    {
+        if (ja[i].is<int>() == false)
+        {
+            Serial.printf("ja[%d] is not int\n", i);
+            r.set<int>(0);
+            return;    
+        }
+        sum += ja[i].as<int>();
+    }
+    
+    r.set<int>(sum);
+    Serial.printf("r %d\n", r.as<int>());    
+}
+
+void json_rpc_method_sum_array_object(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    Serial.printf("json_rpc_method_sum_array_object\n");
+    json_rpc_variant_is(p0, JSON_RPC_PARAM_ARRAY);
+
+    if (p0.is<JsonArray>() == false)
+    {
+        Serial.printf("p0 is not array\n");
+        r.set<int>(0);
+        return;    
+    }
+    int sum = 0;
+    JsonArray ja = p0.as<JsonArray>();
+    for(int i = 0; i < ja.size(); i++)
+    {
+        if (ja[i].is<JsonObject>() == false)
+        {
+            Serial.printf("ja[%d] is not int\n", i);
+            r.set<int>(0);
+            return;    
+        }
+        JsonObject jo = ja[i].as<JsonObject>();
+        if (jo["age"].is<int>() == false)
+        {
+            Serial.printf("jo[\"age\"] is not int\n", i);
+            r.set<int>(0);
+            return;    
+        }
+        sum += jo["age"].as<int>();
+    }
+    
+    r.set<int>(sum);
+    Serial.printf("r %d\n", r.as<int>());    
+}
+
+void json_rpc_method_sum_all_object(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    Serial.printf("json_rpc_method_sum_all_object\n");
+    if (p0.is<JsonObject>() == false)
+    {
+        Serial.printf("p0 is not object\n");
+        r.set<int>(0);
+        return;    
+    }
+    if (p1.is<JsonObject>() == false)
+    {
+        Serial.printf("p1 is not object\n");
+        r.set<int>(0);
+        return;    
+    }
+    if (p2.is<JsonObject>() == false)
+    {
+        Serial.printf("p2 is not object\n");
+        r.set<int>(0);
+        return;    
+    }
+    int ip0, ip1, ip2;
+    JsonObject jo;
+    jo = p0.as<JsonObject>();
+    if (jo["age"].is<int>() == false)
+        {
+        Serial.printf("p2 is not int\n");
+        r.set<int>(0);
+        return;    
+    }
+    ip0 = jo["age"].as<int>();
+
+    jo = p1.as<JsonObject>();
+    if (jo["age"].is<int>() == false)
+        {
+        Serial.printf("p2 is not int\n");
+        r.set<int>(0);
+        return;    
+    }
+    ip1 = jo["age"].as<int>();
+    
+    jo = p2.as<JsonObject>();
+    if (jo["age"].is<int>() == false)
+        {
+        Serial.printf("p2 is not int\n");
+        r.set<int>(0);
+        return;    
+    }
+    ip2 = jo["age"].as<int>();
+
+    r.set<int>(ip0 + ip1 + ip2);
+    Serial.printf("r %f\n", r.as<int>());
+}
+
 void setup(void)
 {
     printf("arduino-json-rpc-server-example\n");
@@ -344,7 +506,10 @@ void setup(void)
     json_rpc_server_add_method("subtract", json_rpc_method_subtract2, "minuend", JSON_RPC_PARAM_INT, "subtrahend", JSON_RPC_PARAM_INT, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("choice", json_rpc_method_choice, "select", JSON_RPC_PARAM_BOOL, "text1", JSON_RPC_PARAM_STRING, "text2", JSON_RPC_PARAM_STRING);
     json_rpc_server_add_method("add", json_rpc_method_add2, "a", JSON_RPC_PARAM_FLOAT, "", JSON_RPC_PARAM_NONE, "c", JSON_RPC_PARAM_FLOAT);
-
+    json_rpc_server_add_method("get_obj_name", json_rpc_method_get_obj_name, "obj", JSON_RPC_PARAM_OBJECT, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
+    json_rpc_server_add_method("sum_array", json_rpc_method_sum_array, "obj", JSON_RPC_PARAM_ARRAY, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
+    json_rpc_server_add_method("sum_array_object", json_rpc_method_sum_array_object, "obj", JSON_RPC_PARAM_ARRAY, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
+    json_rpc_server_add_method("sum_all_object", json_rpc_method_sum_all_object, "a", JSON_RPC_PARAM_OBJECT, "b", JSON_RPC_PARAM_OBJECT, "c", JSON_RPC_PARAM_OBJECT);
 }
 
 void loop(void)
@@ -413,7 +578,10 @@ void loop(void)
     else
         Serial.printf("ok\n");
     */
+    
     // CUSTOM TEST CASE
+
+    /*
     // param type is bool, string
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"choice\",\"params\":{\"select\":true,\"text1\":\"seoul\",\"text2\":\"tokyo\"},\"id\":1}");
     json_rpc_loop();
@@ -455,6 +623,42 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
-        
+    */
+
+    // param type is object, Parameter type checking is performed only up to depth level 1.
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"get_obj_name\",\"params\": { \"obj\" : {\"name\":\"myself\"} },\"id\":1}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":\"myself\",\"id\":1}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");        
+
+    // param 1 type is array, Parameter type checking is performed only up to depth level 1.
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"sum_array\",\"params\": { \"obj\" : [ 1,2,3,4,5 ]},\"id\":1}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":15,\"id\":1}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");    
+
+    // param 1 type is array of object
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"sum_array_object\",\"params\": { \"obj\" : [ {\"age\": 1 }, {\"age\": 2 }, {\"age\": 3 } ]},\"id\":1}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":6,\"id\":1}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");   
+
+    // param 1, param 2, param 3 are all object
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"sum_all_object\",\"params\": [ {\"age\": 1 }, {\"age\": 2 }, {\"age\": 3 } ],\"id\":1}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":6,\"id\":1}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");   
     delay(1000);
 }
