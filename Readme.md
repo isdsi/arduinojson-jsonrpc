@@ -12,6 +12,11 @@ ArduinoJson 7 (https://arduinojson.org/)
 # Reference
 https://www.jsonrpc.org/specification
 
+# Note: 
+Handling of various exceptions has not been considered. 
+Only the white cases outlined in the specification have been implemented, 
+and we are not responsible for any issues arising from the use of this code.
+
 # Build
 
 
