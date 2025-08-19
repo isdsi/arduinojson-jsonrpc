@@ -62,6 +62,25 @@ void json_rpc_method_get_obj_name(JsonVariant r, JsonVariant p0, JsonVariant p1,
 }
 
 // USER CHANGE
+void json_rpc_method_sum(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    log_i("p0 %d", p0.as<int>());
+    log_i("p1 %d", p1.as<int>());
+    log_i("p2 %d", p2.as<int>());
+    r.set<int>(p0.as<int>() + p1.as<int>() + p2.as<int>());
+    log_i("r %f", r.as<int>());
+}
+
+// USER CHANGE
+void json_rpc_method_get_data(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
+{
+    JsonArray ja = r.to<JsonArray>();
+    r.add("hello");
+    r.add(5);
+    log_i("r array_count %d", r.as<JsonArray>().size());
+}
+
+// USER CHANGE
 void json_rpc_method_sum_array(JsonVariant r, JsonVariant p0, JsonVariant p1, JsonVariant p2)
 {
     if (p0.is<JsonArray>() == false)
@@ -193,6 +212,8 @@ void setup(void)
     json_rpc_server_add_method("choice", json_rpc_method_choice, "select", JSON_RPC_PARAM_BOOL, "text1", JSON_RPC_PARAM_STRING, "text2", JSON_RPC_PARAM_STRING);
     json_rpc_server_add_method("add", json_rpc_method_add, "a", JSON_RPC_PARAM_FLOAT, "", JSON_RPC_PARAM_NONE, "c", JSON_RPC_PARAM_FLOAT);
     json_rpc_server_add_method("get_obj_name", json_rpc_method_get_obj_name, "obj", JSON_RPC_PARAM_OBJECT, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
+    json_rpc_server_add_method("sum", json_rpc_method_sum, "a", JSON_RPC_PARAM_INT, "b", JSON_RPC_PARAM_INT, "c", JSON_RPC_PARAM_INT);
+    json_rpc_server_add_method("get_data", json_rpc_method_get_data, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("sum_array", json_rpc_method_sum_array, "obj", JSON_RPC_PARAM_ARRAY, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("sum_array_object", json_rpc_method_sum_array_object, "obj", JSON_RPC_PARAM_ARRAY, "", JSON_RPC_PARAM_NONE, "", JSON_RPC_PARAM_NONE);
     json_rpc_server_add_method("sum_all_object", json_rpc_method_sum_all_object, "a", JSON_RPC_PARAM_OBJECT, "b", JSON_RPC_PARAM_OBJECT, "c", JSON_RPC_PARAM_OBJECT);
@@ -242,7 +263,7 @@ void loop(void)
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"foobar\",\"id\":\"1\"}");
     json_rpc_loop();
     s = json_rpc_client_receive_response();
-    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":1}", s.c_str()) != 0)
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":\"1\"}", s.c_str()) != 0)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
@@ -273,10 +294,116 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
-
     
-    // CUSTOM TEST CASE
+    // rpc call with invalid Batch:
+    json_rpc_client_send_request("[1,2,3]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("[{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
+                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
+                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}]"
+                , s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+        
+    // rpc call with an empty Array:
+    json_rpc_client_send_request("[]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+    
+    // Batch 1
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"sum\",\"params\":[1,2,4],\"id\":\"1\"}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":7,\"id\":\"1\"}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
 
+    // Batch 2
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"notify_hello\",\"params\":[7]}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+
+    // Batch 3
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":\"2\"}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":\"2\"}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+
+    // Batch 4
+    json_rpc_client_send_request("{\"foo\":\"boo\"}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+
+    // Batch 5
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"foo.get\",\"params\":{\"name\":\"myself\"},\"id\":\"5\"}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":\"5\"}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+
+    // Batch 6
+    json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"get_data\",\"id\":\"9\"}");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("{\"jsonrpc\":\"2.0\",\"result\":[\"hello\",5],\"id\":\"9\"}", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");
+    
+    // rpc call Batch:
+    json_rpc_client_send_request(
+        "[{\"jsonrpc\":\"2.0\",\"method\":\"sum\",\"params\":[1,2,4],\"id\":\"1\"},"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notify_hello\",\"params\":[7]},"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":\"2\"},"
+        "{\"foo\":\"boo\"},"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"foo.get\",\"params\":{\"name\":\"myself\"},\"id\":\"5\"},"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"get_data\",\"id\":\"9\"}]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp(
+        "[{\"jsonrpc\":\"2.0\",\"result\":7,\"id\":\"1\"},"
+        "{\"jsonrpc\":\"2.0\",\"result\":19,\"id\":\"2\"},"
+        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
+        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":\"5\"},"
+        "{\"jsonrpc\":\"2.0\",\"result\":[\"hello\",5],\"id\":\"9\"}]", s.c_str()) != 0)
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");   
+    
+
+    // rpc call Batch (all notifications):
+    json_rpc_client_send_request(
+        "[{\"jsonrpc\":\"2.0\",\"method\":\"notify_sum\",\"params\":[1,2,4]},"
+        "{\"jsonrpc\":\"2.0\",\"method\":\"notify_hello\",\"params\":[7]}]");
+    json_rpc_loop();
+    s = json_rpc_client_receive_response();
+    if (strcmp("", s.c_str()) != 0) //Nothing is returned for all notification batches
+        Serial.printf("error\n");
+    else
+        Serial.printf("ok\n");    
+
+    // CUSTOM TEST CASE
+        
     // param type is bool, string
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"choice\",\"params\":{\"select\":true,\"text1\":\"seoul\",\"text2\":\"tokyo\"},\"id\":1}");
     json_rpc_loop();

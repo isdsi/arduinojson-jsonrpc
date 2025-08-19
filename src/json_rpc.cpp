@@ -73,28 +73,22 @@ const char* json_rpc_get_error_message(int json_rpc_error_code)
     return p;
 }
 
-void json_rpc_make_error(JsonDocument &jd, int error_code, const char *key, int line)
+void json_rpc_make_error(JsonObject jor, int error_code, const char *key, int line)
 {
-    jd["jsonrpc"] = "2.0";
-    jd["error"]["code"] = error_code;
-    jd["error"]["message"] = json_rpc_get_error_message(error_code);
-    #if 0 // for debug
-    jd["key"] = key;
-    jd["line"] = line;
-    #endif
-    jd["id"] = jvNull;
+    jor["jsonrpc"] = "2.0";
+    jor["error"]["code"] = error_code;
+    jor["error"]["message"] = json_rpc_get_error_message(error_code);
+    log_i("key %s line %d", key, line);
+    jor["id"] = jvNull;
 }
 
-void json_rpc_make_error_id(JsonDocument &jd, int error_code, const char *key, int line, int id)
+void json_rpc_make_error_id(JsonObject jor, int error_code, const char *key, int line, JsonVariant jvId)
 {
-    jd["jsonrpc"] = "2.0";
-    jd["error"]["code"] = error_code;
-    jd["error"]["message"] = json_rpc_get_error_message(error_code);
-    #if 0 // for debug
-    jd["key"] = key;
-    jd["line"] = line;
-    #endif
-    jd["id"] = id;
+    jor["jsonrpc"] = "2.0";
+    jor["error"]["code"] = error_code;
+    jor["error"]["message"] = json_rpc_get_error_message(error_code);
+    log_i("key %s line %d", key, line);
+    jor["id"] = jvId;
 }
 
 bool json_rpc_check_param_exist(const char *n)
@@ -233,49 +227,51 @@ bool json_rpc_variant_is(JsonVariant v, json_rpc_param_t p)
     return true;
 }
 
-void json_rpc_process_object(JsonObject jo, JsonDocument &jr)
+void json_rpc_process_object(JsonObject jo, JsonObject jor, bool batch)
 {
-    
     if (jo["jsonrpc"].is<const char*>() == false)
     {
-        json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "jsonrpc", (int)__LINE__);
-        json_rpc_server_send_response(jr);
+        json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "jsonrpc", (int)__LINE__);
         return;
     }
     
     if (strcmp(jo["jsonrpc"].as<const char*>(), "2.0") != 0)
     {
-        json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "jsonrpc", (int)__LINE__);
-        json_rpc_server_send_response(jr);
+        json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "jsonrpc", (int)__LINE__);
         return;
     }
 
     if (jo["method"].is<const char*>() == false)
     {
-        json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "method", __LINE__);
-        json_rpc_server_send_response(jr);
+        json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "method", __LINE__);
         return;
     }
 
     if (jo["id"].is<int>() == false && jo["id"].is<const char *>() == false)
     {
-        json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "id", __LINE__);
-        json_rpc_server_send_response(jr);
-        return;
+        if (batch == false)
+        {
+            json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "id", __LINE__);
+            return;
+        }
+        else
+        {
+            // notify hello인데 배치모드이면 무시된다.
+            jor["notify"] = true;
+            return;
+        }
     }
-    
+
     if (json_rpc_server_contain_method(jo["method"].as<const char*>()) == false)
     {
-        json_rpc_make_error_id(jr, JSON_RPC_ERROR_CODE_METHOD_NOT_FOUND, jo["method"].as<const char*>(), __LINE__, jo["id"].as<int>());
-        json_rpc_server_send_response(jr);
+        json_rpc_make_error_id(jor, JSON_RPC_ERROR_CODE_METHOD_NOT_FOUND, jo["method"].as<const char*>(), __LINE__, jo["id"]);
         return;
     }
 
     json_rpc_method_t server_method = json_rpc_server_get_method(jo["method"]);
     if (server_method == NULL)
     {
-        json_rpc_make_error_id(jr, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__, jo["id"].as<int>());
-        json_rpc_server_send_response(jr);
+        json_rpc_make_error_id(jor, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__, jo["id"]);
         return;
     }
 
@@ -287,8 +283,7 @@ void json_rpc_process_object(JsonObject jo, JsonDocument &jr)
     // -- no param like 'void'
     if (server_params.isNull())
     {
-        json_rpc_make_error_id(jr, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__, jo["id"].as<int>());
-        json_rpc_server_send_response(jr);
+        json_rpc_make_error_id(jor, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__, jo["id"]);
         return;
     }
     */
@@ -313,11 +308,10 @@ void json_rpc_process_object(JsonObject jo, JsonDocument &jr)
             vi++;
         }
         
-        jr["jsonrpc"] = "2.0";
-        jr["result"] = ""; // create a key
-        server_method(jr["result"], client_value[0], client_value[1], client_value[2]);
-        jr["id"] = jo["id"].as<int>();
-        json_rpc_server_send_response(jr);
+        jor["jsonrpc"] = "2.0";
+        jor["result"] = ""; // create a key
+        server_method(jor["result"], client_value[0], client_value[1], client_value[2]);
+        jor["id"] = jo["id"];
         return;
     }
     
@@ -340,11 +334,10 @@ void json_rpc_process_object(JsonObject jo, JsonDocument &jr)
             vi++;
         }
 
-        jr["jsonrpc"] = "2.0";
-        jr["result"] = ""; // create a key
-        server_method(jr["result"], client_value[0], client_value[1], client_value[2]);
-        jr["id"] = jo["id"].as<int>();
-        json_rpc_server_send_response(jr);
+        jor["jsonrpc"] = "2.0";
+        jor["result"] = ""; // create a key
+        server_method(jor["result"], client_value[0], client_value[1], client_value[2]);
+        jor["id"] = jo["id"];
         return;
     }    
 
@@ -354,21 +347,18 @@ void json_rpc_process_object(JsonObject jo, JsonDocument &jr)
 
         if (server_params.isNull() == false)
         {
-            json_rpc_make_error_id(jr, JSON_RPC_ERROR_CODE_INVALID_PARAMS, "", __LINE__, jo["id"].as<int>());
-            json_rpc_server_send_response(jr);
+            json_rpc_make_error_id(jor, JSON_RPC_ERROR_CODE_INVALID_PARAMS, "", __LINE__, jo["id"]);
             return;
         }
 
-        jr["jsonrpc"] = "2.0";
-        jr["result"] = ""; // create a key
-        server_method(jr["result"], client_value[0], client_value[1], client_value[2]);
-        jr["id"] = jo["id"].as<int>();
-        json_rpc_server_send_response(jr);
+        jor["jsonrpc"] = "2.0";
+        jor["result"] = ""; // create a key
+        server_method(jor["result"], client_value[0], client_value[1], client_value[2]);
+        jor["id"] = jo["id"];
         return;
     }
     
-    json_rpc_make_error_id(jr, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__, jo["id"].as<int>());
-    json_rpc_server_send_response(jr);
+    json_rpc_make_error_id(jor, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__, jo["id"]);
 }
 
 void json_rpc_loop(void)
@@ -376,20 +366,45 @@ void json_rpc_loop(void)
     JsonDocument jd;
     JsonDocument jr;
     JsonArray ja;
+    JsonArray jar;
     JsonObject jo;
+    JsonObject jor;
     String s;
+
+    /*
+    // Create an object and serialize it
+    JsonDocument doc;
+
+    // create an object
+    JsonObject object = doc.to<JsonObject>();
+    object["hello"] = "world";
+    */
+
+    /*
+    // deserialize the object
+    JsonDocument doc;
+    deserializeJson(doc, "{\"hello\":\"world\"}");
+
+    // extract the data
+    JsonObject object = doc.as<JsonObject>();
+    const char* world = object["hello"];
+    */
 
     if (json_rpc_server_receive_request(jd) == false)
     {
-        json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_PARSE_ERROR, "jsonrpc", (int)__LINE__);
+        jor = jr.to<JsonObject>();
+        json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_PARSE_ERROR, "jsonrpc", (int)__LINE__);
         json_rpc_server_send_response(jr);
         return;
     }
 
+
     if (jd.is<JsonObject>())
     {
         jo = jd.as<JsonObject>();
-        json_rpc_process_object(jo, jr);
+        jor = jr.to<JsonObject>();
+        json_rpc_process_object(jo, jor, false);
+        json_rpc_server_send_response(jr);
         return;
     }
 
@@ -397,18 +412,36 @@ void json_rpc_loop(void)
     {
         if (jd.size() == 0)
         {
-            json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "", __LINE__);
+            jor = jr.to<JsonObject>();
+            json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_INVALID_REQUEST, "", __LINE__);
             json_rpc_server_send_response(jr);
             return;
         }
 
+        ja = jd.as<JsonArray>();
+        jar = jr.to<JsonArray>();
         for(int i = 0; i < jd.size(); i++)
         {
-            ja = jd[i].as<JsonArray>();
-            json_rpc_process_object(jo, jr);
+            jo = ja[i].as<JsonObject>();
+            jor = jar.add<JsonObject>();
+            json_rpc_process_object(jo, jor, true);
         }
+        for(int i = jar.size() - 1; i >= 0; i--)
+        {
+            jor = jar[i].as<JsonObject>();
+            if (jor["notify"].is<bool>()) // notify hello
+            {
+                jar.remove(i);
+                log_i("notify removed %d", jar.size());
+            }
+        }
+        if (jar.size() == 0) // Nothing is returned for all notification batches
+            return;
+        json_rpc_server_send_response(jr);
         return;
     }
-    json_rpc_make_error(jr, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__);
+
+    jor = jr.to<JsonObject>();
+    json_rpc_make_error(jor, JSON_RPC_ERROR_CODE_INTERNAL_ERROR, "", __LINE__);
     json_rpc_server_send_response(jr);
 }
