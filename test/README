@@ -1,0 +1,24 @@
+
+This directory is intended for PlatformIO Test Runner and project tests.
+
+Unit Testing is a software testing method by which individual units of
+source code, sets of one or more MCU program modules together with associated
+control data, usage procedures, and operating procedures, are tested to
+determine whether they are fit for use. Unit testing finds problems early
+in the development cycle.
+
+More information about PlatformIO Unit Testing:
+- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+
+
+# 개요
+이것은 json 을 기반으로 원격 프로시져 호출에 대한 정의 json-rpc 에 따라 구현하였다.
+arduino 프레임워크상에서 arduinoJson 라이브러리를 사용하는 모든 임베디드 시스템에서 사용 가능하다.
+테스트는 아두이노의 Serial.Printf를 사용하여 서버는 출력하고 Serial.readbytes를 통해 입력받는다.
+클라이언트는 요청하고 서버는 응답한다.
+
+# 참조
+json-rpc : https://www.jsonrpc.org/specification
+
+# 테스트
+이 코드는 esp32-s3-devkitc-1 개발 보드로 테스트 되었다. pin18, pin17 을 short 시켜야한다.
