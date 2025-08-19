@@ -90,11 +90,18 @@ void json_rpc_make_error_id(JsonDocument &jd, int error_code, const char *key, i
     jd["jsonrpc"] = "2.0";
     jd["error"]["code"] = error_code;
     jd["error"]["message"] = json_rpc_get_error_message(error_code);
-    #if 1 // for debug
+    #if 0 // for debug
     jd["key"] = key;
     jd["line"] = line;
     #endif
     jd["id"] = id;
+}
+
+bool json_rpc_check_param_exist(const char *n)
+{
+    if (n == NULL || strlen(n) == 0)
+        return false;
+    return true;
 }
 
 void json_rpc_server_add_method(const char* method, json_rpc_method_t m, 
@@ -103,13 +110,28 @@ void json_rpc_server_add_method(const char* method, json_rpc_method_t m,
     const char *p2Name, json_rpc_param_t p2Type)
 {
     json_rpc_server[method]["func"] = (unsigned int)m;
-    json_rpc_server[method]["params"] = ""; // no param like 'void'
-    if (p0Name != NULL && strlen(p0Name) != 0)
+    
+    if (json_rpc_check_param_exist(p0Name) == false &&
+        json_rpc_check_param_exist(p1Name) == false &&
+        json_rpc_check_param_exist(p2Name) == false)
+    {
+        json_rpc_server[method]["params"] = jvNull; // no param like 'void'
+        return;
+    }
+    
+    if (json_rpc_check_param_exist(p0Name))
         json_rpc_server[method]["params"][p0Name] = p0Type;
-    if (p1Name != NULL && strlen(p1Name) != 0)
+    else
+        json_rpc_server[method]["params"][p0Name] = jvNull;
+    if (json_rpc_check_param_exist(p1Name))
         json_rpc_server[method]["params"][p1Name] = p1Type;
-    if (p2Name != NULL && strlen(p2Name) != 0)
+    else
+        json_rpc_server[method]["params"][p1Name] = jvNull;
+    if (json_rpc_check_param_exist(p2Name))
         json_rpc_server[method]["params"][p2Name] = p2Type;
+    else
+        json_rpc_server[method]["params"][p2Name] = jvNull;
+    
 }
 
 bool json_rpc_server_contain_method(const char* method)
@@ -257,7 +279,7 @@ void json_rpc_process_object(JsonObject jo, JsonDocument &jr)
         return;
     }
 
-    JsonObject server_params = json_rpc_server_get_params(jo["method"]);
+    JsonObject server_params = json_rpc_server_get_params(jo["method"]); // 없다면 null, 있다면 세개의 파라미터를 보장한다.
     String s;
     serializeJson(json_rpc_server, s);
     log_i("%s", s.c_str());    

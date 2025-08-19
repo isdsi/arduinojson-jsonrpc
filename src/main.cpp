@@ -203,7 +203,7 @@ void loop(void)
 {
 
     String s;
-    /*
+    
     // rpc call with positional parameters
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23],\"id\":1}");
     json_rpc_loop();
@@ -212,7 +212,7 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
-        
+      
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[23,42],\"id\":1}");
     json_rpc_loop();
     s = json_rpc_client_receive_response();
@@ -273,32 +273,10 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
-    */
-    // rpc call with an empty Array:
-    json_rpc_client_send_request("[]");
-    json_rpc_loop();
-    s = json_rpc_client_receive_response();
-    if (strcmp("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}", s.c_str()) != 0)
-        Serial.printf("error\n");
-    else
-        Serial.printf("ok\n");
+
     
-    // rpc call with invalid Batch:
-    json_rpc_client_send_request("[1,2,3]");
-    json_rpc_loop();
-    s = json_rpc_client_receive_response();
-    if (strcmp("[{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
-                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null},"
-                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request\"},\"id\":null}]"
-                , s.c_str()) != 0)
-        Serial.printf("error\n");
-    else
-        Serial.printf("ok\n");
-
-
     // CUSTOM TEST CASE
 
-    /*
     // param type is bool, string
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"choice\",\"params\":{\"select\":true,\"text1\":\"seoul\",\"text2\":\"tokyo\"},\"id\":1}");
     json_rpc_loop();
@@ -323,7 +301,7 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
-
+    
     // param type is float, param a,c use, param b is no use
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"add\",\"params\":{\"a\":23.1,\"c\":42.555},\"id\":111}");
     json_rpc_loop();
@@ -340,7 +318,7 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");
-
+    
     // param type is object, Parameter type checking is performed only up to depth level 1.
     json_rpc_client_send_request("{\"jsonrpc\":\"2.0\",\"method\":\"get_obj_name\",\"params\": { \"obj\" : {\"name\":\"myself\"} },\"id\":1}");
     json_rpc_loop();
@@ -394,6 +372,6 @@ void loop(void)
         Serial.printf("error\n");
     else
         Serial.printf("ok\n");   
-    */
+    
     delay(1000);
 }
