@@ -18,7 +18,8 @@ Only the white cases outlined in the specification have been implemented,
 and we are not responsible for any issues arising from the use of this code.
 
 # Build
-
+Please, refer to below link.
+https://docs.platformio.org/en/latest/integration/ide/pioide.html
 
 # Test
 Tested on the esp32-s3-devkitc-1 board. Pins 17 and 18 must be shorted during execution.
