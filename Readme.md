@@ -23,6 +23,7 @@ and we are not responsible for any issues arising from the use of this code.
 # Test
 Tested on the esp32-s3-devkitc-1 board. Pins 17 and 18 must be shorted during execution.
 
+'''
 ESP-ROM:esp32s3-20210327
 Build:Mar 27 2021
 rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)
@@ -119,3 +120,4 @@ ok
 --> {"jsonrpc":"2.0","method":"say_hello","params": [],"id":1}
 <-- {"jsonrpc":"2.0","result":"hello","id":1}
 ok
+'''
